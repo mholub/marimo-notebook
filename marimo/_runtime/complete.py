@@ -55,10 +55,10 @@ def _should_include_name(name: str, prefix: str) -> bool:
 
 def _get_docstring(completion: jedi.api.classes.BaseName) -> str:
     try:
-        body = cast(str, completion.docstring(raw=True))
-        if len(body) == 0:
+        docstring = cast(str, completion.docstring(raw=True))
+        if len(docstring) == 0:
             resolved_object, _ = pydoc.resolve(completion.full_name)
-            body = pydoc.getdoc(resolved_object)
+            docstring = pydoc.getdoc(resolved_object)
     except Exception:
         LOGGER.debug(
             "Failed to get docstring for %s of type %s",
@@ -96,32 +96,32 @@ def _get_docstring(completion: jedi.api.classes.BaseName) -> str:
             apply_markdown_class=False,
         ).text
 
-    if body:
+    if docstring:
         # for marimo docstrings, treat them as markdown
         # for other modules, treat them as plain text
         if completion.module_name.startswith("marimo"):
-            body = _md(body, apply_markdown_class=False).text
+            docstring = _md(docstring, apply_markdown_class=False).text
         else:
             try:
-                body = (
+                docstring = (
                     "<div class='external-docs'>"
-                    + convert_rst_to_html(body)
+                    + convert_rst_to_html(docstring)
                     + "</div>"
                 )
             except Exception as e:
                 # if docutils chokes, we don't want to crash the completion
                 # worker
                 LOGGER.debug("Converting RST to HTML failed: ", e)
-                body = (
+                docstring = (
                     "<pre class='external-docs'>"
-                    + html.escape(body)
+                    + html.escape(docstring)
                     + "</pre>"
                 )
 
-    if signature_text and body:
-        docstring = signature_text + "\n\n" + body
+    if signature_text and docstring:
+        result = signature_text + "\n\n" + docstring
     else:
-        docstring = signature_text + body
+        result = signature_text + docstring
 
     if completion.type == "class":
         # Append the __init__ docstring.
@@ -142,12 +142,19 @@ def _get_docstring(completion: jedi.api.classes.BaseName) -> str:
                                 init_docstring, apply_markdown_class=False
                             ).text
                         )
-                    if docstring and init_docstring:
-                        docstring += "\n\n" + init_docstring
+                    if result and init_docstring:
+                        result += "\n\n" + init_docstring
                     else:
-                        docstring += init_docstring
+                        result += init_docstring
 
-    return docstring
+    if completion.type == "module":
+        declarations_docstring = "Module declarations"
+        if result and declarations_docstring:
+            result += "\n\n" + declarations_docstring
+        else:
+            result += declarations_docstring
+
+    return result
 
 
 def _get_type_hint(completion: jedi.api.classes.BaseName) -> str:
