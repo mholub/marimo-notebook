@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import pydoc
 import threading
 import time
 from typing import TYPE_CHECKING, Any, cast
@@ -55,8 +56,15 @@ def _should_include_name(name: str, prefix: str) -> bool:
 def _get_docstring(completion: jedi.api.classes.BaseName) -> str:
     try:
         body = cast(str, completion.docstring(raw=True))
+        if len(body) == 0:
+            resolved_object, _ = pydoc.resolve(completion.full_name)
+            body = pydoc.getdoc(resolved_object)
     except Exception:
-        LOGGER.debug("Failed to get docstring for %s", completion.name)
+        LOGGER.debug(
+            "Failed to get docstring for %s of type %s",
+            completion.name,
+            completion.type,
+        )
         return ""
 
     if completion.type == "function":
