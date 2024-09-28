@@ -103,13 +103,17 @@ class MarimoTextDoc(pydoc.Doc):
                 return '<a href="%s">%s</a>' % (dict[name], name)
         return name
 
-    def classlink(self, object, modname):
+    def classlink(self, object, modname, cdict=None):
         """Make a link for a class."""
         # name, module = object.__name__, sys.modules.get(object.__module__)
         # if hasattr(module, name) and getattr(module, name) is object:
         #     return '<a href="%s.html#%s">%s</a>' % (
         #         module.__name__, name, pydoc.classname(object, modname))
-        return pydoc.classname(object, modname)
+        alias = cdict.get(object) if cdict else None
+        if alias:
+            return f"<b>{alias}</b> ({pydoc.classname(object, modname)})"
+        else:
+            return pydoc.classname(object, modname)
 
     def parentlink(self, object, modname):
         """Make a link for the enclosing class or module."""
@@ -197,7 +201,7 @@ class MarimoTextDoc(pydoc.Doc):
 
     # ---------------------------------------------- type-specific routines
 
-    def formattree(self, tree, modname, parent=None):
+    def formattree(self, tree, modname, cdict, parent=None):
         """Produce HTML for a class tree as given by inspect.getclasstree()."""
         if not parent:
             result = '<div style="border: 1px solid #ccc; padding: 10px; font-size: 13px;">'
@@ -207,15 +211,15 @@ class MarimoTextDoc(pydoc.Doc):
             if isinstance(entry, tuple):
                 c, bases = entry
                 result += '<div style="padding-left: {}em;">'.format(2 * (len(c.__qualname__.split('.')) - 1))
-                result += self.classlink(c, modname)
+                result += self.classlink(c, modname, cdict)
                 if bases and bases != (parent,):
                     parents = []
                     for base in bases:
-                        parents.append(self.classlink(base, modname))
+                        parents.append(self.classlink(base, modname, cdict))
                     result += '(' + ', '.join(parents) + ')'
                 result += '</div>\n'
             elif isinstance(entry, list):
-                result += self.formattree(entry, modname, c)
+                result += self.formattree(entry, modname, cdict, c)
 
         result += '</div>'
         return result
@@ -257,36 +261,6 @@ class MarimoTextDoc(pydoc.Doc):
 
         modules = inspect.getmembers(object, inspect.ismodule)
 
-        classes, cdict = [], {}
-        for key, value in inspect.getmembers(object, inspect.isclass):
-            # if __all__ exists, believe it.  Otherwise use old heuristic.
-            if (all is not None or
-                (inspect.getmodule(value) or object) is object):
-                if pydoc.visiblename(key, all, object):
-                    classes.append((key, value))
-                    cdict[key] = cdict[value] = '#' + key
-        for key, value in classes:
-            for base in value.__bases__:
-                key, modname = base.__name__, base.__module__
-                module = sys.modules.get(modname)
-                if modname != name and module and hasattr(module, key):
-                    if getattr(module, key) is base:
-                        if key not in cdict:
-                            cdict[key] = cdict[base] = modname + '.html#' + key
-        funcs, fdict = [], {}
-        for key, value in inspect.getmembers(object, inspect.isroutine):
-            # if __all__ exists, believe it.  Otherwise use old heuristic.
-            if (all is not None or
-                inspect.isbuiltin(value) or inspect.getmodule(value) is object):
-                if pydoc.visiblename(key, all, object):
-                    funcs.append((key, value))
-                    fdict[key] = '#-' + key
-                    if inspect.isfunction(value): fdict[value] = fdict[key]
-        data = []
-        for key, value in inspect.getmembers(object, pydoc.isdata):
-            if pydoc.visiblename(key, all, object):
-                data.append((key, value))
-
         if hasattr(object, '__path__'):
             modpkgs = []
             for importer, modname, ispkg in pkgutil.iter_modules(object.__path__):
@@ -300,10 +274,43 @@ class MarimoTextDoc(pydoc.Doc):
                 modules, lambda t: self.modulelink(t[1]))
             result = result + self.bigsection(
                 'Modules', 'pkg-content', contents)
+            
+        classes, cdict = [], {}
+        for key, value in inspect.getmembers(object, inspect.isclass):
+            # if __all__ exists, believe it.  Otherwise use old heuristic.
+            if (all is not None or
+                (inspect.getmodule(value) or object) is object):
+                if pydoc.visiblename(key, all, object):
+                    classes.append((key, value))
+                    cdict[key] = cdict[value] = name + "." + key
+        # for key, value in classes:
+        #     for base in value.__bases__:
+        #         key, modname = base.__name__, base.__module__
+        #         module = sys.modules.get(modname)
+        #         if modname != name and module and hasattr(module, key):
+        #             if getattr(module, key) is base:
+        #                 if key not in cdict:
+        #                     cdict[key] = cdict[base] = modname + key
+
+        funcs, fdict = [], {}
+        for key, value in inspect.getmembers(object, inspect.isroutine):
+            # if __all__ exists, believe it.  Otherwise use old heuristic.
+            if (all is not None or
+                inspect.isbuiltin(value) or inspect.getmodule(value) is object):
+                if pydoc.visiblename(key, all, object):
+                    funcs.append((key, value))
+                    fdict[key] = '#-' + key
+                    if inspect.isfunction(value): fdict[value] = fdict[key]
+        data = []
+        for key, value in inspect.getmembers(object, pydoc.isdata):
+           # if (key == '__all__'):
+           #     continue
+            if pydoc.visiblename(key, all, object):
+                data.append((key, value))
 
         if classes:
             classlist = [value for (key, value) in classes]
-            contents = self.formattree(inspect.getclasstree(classlist, 1), name)
+            contents = self.formattree(inspect.getclasstree(classlist, True), name, cdict)
             # for key, value in classes:
             #     contents.append(self.document(value, key, name, fdict, cdict))
             result = result + self.bigsection(
@@ -330,6 +337,12 @@ class MarimoTextDoc(pydoc.Doc):
             result = result + self.bigsection('Credits', 'credits', contents)
 
         return result
+    
+    def get_classes(self, object, name, all):
+        """Get classes defined in the object."""
+
+        
+        return classes, cdict
 
     def docclass(self, object, name=None, mod=None, funcs={}, classes={},
                  *ignored):
