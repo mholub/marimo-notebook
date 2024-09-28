@@ -15,7 +15,7 @@ from marimo._messaging.completion_option import CompletionOption
 from marimo._messaging.ops import CompletionResult
 from marimo._messaging.types import Stream
 from marimo._output.md import _md
-from marimo._runtime import dataflow
+from marimo._runtime import dataflow, doc_renderer
 from marimo._runtime.requests import CodeCompletionRequest
 from marimo._server.types import QueueType
 from marimo._utils.format_signature import format_signature
@@ -52,6 +52,7 @@ def _should_include_name(name: str, prefix: str) -> bool:
     else:
         return True
 
+renderer = doc_renderer.MarimoTextDoc()
 
 def _get_docstring(completion: jedi.api.classes.BaseName) -> str:
     try:
@@ -148,7 +149,8 @@ def _get_docstring(completion: jedi.api.classes.BaseName) -> str:
                         result += init_docstring
 
     if completion.type == "module":
-        declarations_docstring = "Module declarations"
+        resolved_object, _ = pydoc.resolve(completion.full_name)
+        declarations_docstring = renderer.docmodule(resolved_object)
         if result and declarations_docstring:
             result += "\n\n" + declarations_docstring
         else:
