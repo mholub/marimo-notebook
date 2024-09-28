@@ -139,7 +139,7 @@ class MarimoTextDoc(pydoc.Doc):
 
     def modulelink(self, object):
         """Make a link for a module."""
-        return object.__name__ # TODO: we can generate special links which live docs can switch to in the future
+        return object[0] # TODO: we can generate special links which live docs can switch to in the future
         return '<a href="%s.html">%s</a>' % (object.__name__, object.__name__)
 
     def modpkglink(self, modpkginfo):
@@ -262,21 +262,23 @@ class MarimoTextDoc(pydoc.Doc):
             docloc = ''
         result = result + docloc
 
+        mods_or_packages = {}
+
         modules = inspect.getmembers(object, inspect.ismodule)
+        if modules:
+            for mod in modules:
+                mods_or_packages[mod[0]] = self.modulelink(mod)
 
         if hasattr(object, '__path__'):
-            modpkgs = []
             for importer, modname, ispkg in pkgutil.iter_modules(object.__path__):
-                modpkgs.append((modname, name, ispkg, 0))
-            modpkgs.sort()
-            contents = self.multicolumn(modpkgs, self.modpkglink)
-            result = result + self.bigsection(
-                'Package Contents', 'pkg-content', contents)
-        elif modules:
-            contents = self.multicolumn(
-                modules, lambda t: self.modulelink(t[1]))
-            result = result + self.bigsection(
-                'Modules', 'pkg-content', contents)
+                mods_or_packages[modname] = self.modpkglink((modname, name, ispkg, 0))
+
+        package_contents = list(mods_or_packages.values())
+        package_contents.sort()
+        
+        contents = self.multicolumn(package_contents)
+        result = result + self.bigsection(
+            'Modules and Packages', 'pkg-content', contents)
             
         classes, cdict = [], {}
         for key, value in inspect.getmembers(object, inspect.isclass):
