@@ -20,6 +20,9 @@ from marimo._server.types import QueueType
 from marimo._utils.format_signature import format_signature
 from marimo._utils.rst_to_html import convert_rst_to_html
 
+
+from sys import path as syspath
+
 if TYPE_CHECKING:
     import threading
 
@@ -259,7 +262,9 @@ def _drain_queue(
 def _get_completions_with_script(
     codes: list[str], document: str
 ) -> tuple[jedi.Script, list[jedi.api.classes.Completion]]:
-    script = jedi.Script("\n".join(codes + [document]))
+    project = jedi.Project(syspath[0])
+
+    script = jedi.Script("\n".join(codes + [document]), project=project)
     completions = script.complete()
     return script, completions
 
@@ -274,7 +279,9 @@ def _get_completions_with_interpreter(
     # lock on the globals dict. This is best-effort -- if the kernel
     # has locked globals, we simply don't complete instead of waiting
     # for the lock to be released.
-    script = jedi.Interpreter(document, [glbls])
+    project = jedi.Project(syspath[0])
+
+    script = jedi.Interpreter(document, [glbls], project=project)
     locked = False
     completions = []
     locked = glbls_lock.acquire(blocking=False)
