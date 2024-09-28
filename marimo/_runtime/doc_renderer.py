@@ -25,10 +25,13 @@ from traceback import format_exception_only
 
 class MarimoTextDoc(pydoc.Doc):
     # ------------------------------------------- HTML formatting utilities
-
     _repr_instance = pydoc.HTMLRepr()
     repr = _repr_instance.repr
     escape = _repr_instance.escape
+
+    def __init__(self, include_doc_string=True) -> None:
+        self.include_doc_string = include_doc_string
+        super().__init__()
 
     def section(self, title, cls, contents, width=6,
                 prelude='', marginalia=None, gap='&nbsp;'):
@@ -237,30 +240,36 @@ class MarimoTextDoc(pydoc.Doc):
             all = object.__all__
         except AttributeError:
             all = None
-        parts = name.split('.')
-        links = []
-        for i in range(len(parts)-1):
-            links.append(
-                '<a href="%s.html" class="white">%s</a>' %
-                ('.'.join(parts[:i+1]), parts[i]))
-        linkedname = '.'.join(links + parts[-1:])
-        head = '<strong class="title">%s</strong>' % linkedname
-        info = []
-        if hasattr(object, '__version__'):
-            version = str(object.__version__)
-            if version[:11] == '$' + 'Revision: ' and version[-1:] == '$':
-                version = version[11:-1].strip()
-            info.append('version %s' % self.escape(version))
-        if hasattr(object, '__date__'):
-            info.append(self.escape(str(object.__date__)))
-        if info:
-            head = head + ' (%s)' % ', '.join(info)
-        docloc = self.getdocloc(object)
-        if docloc is not None:
-            docloc = '<a href="%(docloc)s" />%(docloc)s</a>' % locals()
-        else:
-            docloc = ''
-        result = result + docloc
+
+        classes, cdict = [], {}
+        for key, value in inspect.getmembers(object, inspect.isclass):
+            # if __all__ exists, believe it.  Otherwise use old heuristic.
+            if (all is not None or
+                (inspect.getmodule(value) or object) is object):
+                if pydoc.visiblename(key, all, object):
+                    classes.append((key, value))
+                    cdict[key] = cdict[value] = name + "." + key
+
+        funcs, fdict = [], {}
+        for key, value in inspect.getmembers(object, inspect.isroutine):
+            # if __all__ exists, believe it.  Otherwise use old heuristic.
+            if (all is not None or
+                inspect.isbuiltin(value) or inspect.getmodule(value) is object):
+                if pydoc.visiblename(key, all, object):
+                    funcs.append((key, value))
+                    fdict[key] = '#-' + key
+                    if inspect.isfunction(value): fdict[value] = fdict[key]
+        data = []
+        for key, value in inspect.getmembers(object, pydoc.isdata):
+           # if (key == '__all__'):
+           #     continue
+            if pydoc.visiblename(key, all, object):
+                data.append((key, value))
+
+        if self.include_doc_string:
+            doc = self.markup(pydoc.getdoc(object), self.preformat, cdict, fdict)
+            doc = self.bigsection('Description', 'desc', doc)
+            result = result + doc
 
         mods_or_packages = {}
 
@@ -280,14 +289,7 @@ class MarimoTextDoc(pydoc.Doc):
         result = result + self.bigsection(
             'Modules and Packages', 'pkg-content', contents)
             
-        classes, cdict = [], {}
-        for key, value in inspect.getmembers(object, inspect.isclass):
-            # if __all__ exists, believe it.  Otherwise use old heuristic.
-            if (all is not None or
-                (inspect.getmodule(value) or object) is object):
-                if pydoc.visiblename(key, all, object):
-                    classes.append((key, value))
-                    cdict[key] = cdict[value] = name + "." + key
+
         # for key, value in classes:
         #     for base in value.__bases__:
         #         key, modname = base.__name__, base.__module__
@@ -297,21 +299,7 @@ class MarimoTextDoc(pydoc.Doc):
         #                 if key not in cdict:
         #                     cdict[key] = cdict[base] = modname + key
 
-        funcs, fdict = [], {}
-        for key, value in inspect.getmembers(object, inspect.isroutine):
-            # if __all__ exists, believe it.  Otherwise use old heuristic.
-            if (all is not None or
-                inspect.isbuiltin(value) or inspect.getmodule(value) is object):
-                if pydoc.visiblename(key, all, object):
-                    funcs.append((key, value))
-                    fdict[key] = '#-' + key
-                    if inspect.isfunction(value): fdict[value] = fdict[key]
-        data = []
-        for key, value in inspect.getmembers(object, pydoc.isdata):
-           # if (key == '__all__'):
-           #     continue
-            if pydoc.visiblename(key, all, object):
-                data.append((key, value))
+        
 
         if classes:
             classlist = [value for (key, value) in classes]

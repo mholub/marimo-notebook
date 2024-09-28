@@ -52,7 +52,7 @@ def _should_include_name(name: str, prefix: str) -> bool:
     else:
         return True
 
-renderer = doc_renderer.MarimoTextDoc()
+renderer = doc_renderer.MarimoTextDoc(False)
 
 def _get_docstring(completion: jedi.api.classes.BaseName) -> str:
     try:
