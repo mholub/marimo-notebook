@@ -68,19 +68,22 @@ class MarimoTextDoc(pydoc.Doc):
         return pydoc.replace(text, '\n\n', '\n \n', '\n\n', '\n \n',
                              ' ', '&nbsp;', '\n', '<br>\n')
 
-    def multicolumn(self, list, format = str):
+    def multicolumn(self, list, format=str):
         """Format a list of items into a multi-column list."""
         if not list:
             return ''
 
         result = ''
-        rows = (len(list) + 3) // 4
-        for col in range(4):
+        num_items = len(list)
+        num_columns = min(4, num_items)
+        rows = (num_items + num_columns - 1) // num_columns
+
+        for col in range(num_columns):
             result = result + '<td class="multicolumn">'
-            for i in range(rows*col, rows*col+rows):
-                if i < len(list):
-                    result = result + format(list[i]) + '<br>\n'
+            for i in range(col * rows, min((col + 1) * rows, num_items)):
+                result = result + format(list[i]) + '<br>\n'
             result = result + '</td>'
+
         return '<table><tr>%s</tr></table>' % result
 
     def simplelist(self, items, format=str):
