@@ -328,7 +328,7 @@ class MarimoTextDoc(pydoc.Doc):
             if name.type == 'statement' and self.visiblename(name.name):
                 desc = name.description
                 if desc.startswith(name.name + ' = '):
-                    datas_dict[name.name] = self.escape(self.cram(desc, 512))
+                    datas_dict[name.name] = self.escape(name.name)
                 if desc.startswith("del"):
                     datas_dict.pop(name.name, None)
         datas = list(datas_dict.values())
