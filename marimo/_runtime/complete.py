@@ -23,6 +23,8 @@ from marimo._utils.rst_to_html import convert_rst_to_html
 
 from sys import path as syspath
 
+from marimo._runtime.doc_renderer import MarimoTextDoc
+
 if TYPE_CHECKING:
     import threading
 
@@ -53,6 +55,10 @@ def _should_include_name(name: str, prefix: str) -> bool:
             return True
     else:
         return True
+    
+renderer = MarimoTextDoc()
+
+import pydoc
 
 def _get_docstring(completion: jedi.api.classes.BaseName) -> str:
     try:
@@ -144,6 +150,15 @@ def _get_docstring(completion: jedi.api.classes.BaseName) -> str:
                         result += "\n\n" + init_docstring
                     else:
                         result += init_docstring
+    
+    if completion.type == "module":
+        LOGGER.debug(f"COMPLETION {completion.full_name} {completion.type}")
+
+        declarations_docstring = renderer.docmodule(completion)
+        if result and declarations_docstring:
+            result += "\n\n" + declarations_docstring
+        else:
+            result += declarations_docstring
 
     return result
 
