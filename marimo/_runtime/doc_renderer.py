@@ -44,9 +44,9 @@ class MarimoTextDoc(pydoc.Doc):
                     '__date__', '__doc__', '__file__', '__spec__',
                     '__loader__', '__module__', '__name__', '__package__',
                     '__path__', '__qualname__', '__slots__', '__version__'}:
-            return 0
+            return False
         # Private names are hidden, but special names are displayed.
-        if name.startswith('__') and name.endswith('__'): return 1
+        if name.startswith('__') and name.endswith('__'): return True
         # Namedtuples have public fields and methods with a single leading underscore
         if name.startswith('_') and hasattr(obj, '_fields'):
             return True
@@ -327,20 +327,19 @@ class MarimoTextDoc(pydoc.Doc):
         if funcs:
             result = result + self.bigsection(
                 'Functions', 'functions', self.multicolumn(funcs))
-        # if data:
-        #     contents = []
-        #     for key, value in data:
-        #         contents.append(self.document(value, key))
-        #     contents.sort(key=str.lower)
-        #     result = result + self.bigsection(
-        #         'Data', 'data', '<br>\n'.join(contents))
-        # if hasattr(object, '__author__'):
-        #     contents = self.markup(str(object.__author__), self.preformat)
-        #     result = result + self.bigsection('Author', 'author', contents)
-        # if hasattr(object, '__credits__'):
-        #     contents = self.markup(str(object.__credits__), self.preformat)
-        #     result = result + self.bigsection('Credits', 'credits', contents)
-
+        
+        datas = []
+        for name in all_defined_names:
+            if name.type == 'statement' and self.visiblename(name.name):
+                desc = name.description
+                if desc.startswith(name.name + ' = '):
+                    datas.append(name.name)
+        datas = list(dict.fromkeys(datas))
+        datas.sort(key=str.lower)
+        if datas:
+            result = result + self.bigsection(
+                'Data', 'data', '<br>\n'.join(datas))
+    
         return result
 
     def docclass(self, object, name=None, mod=None, funcs={}, classes={},
