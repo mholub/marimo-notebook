@@ -54,12 +54,15 @@ def _should_include_name(name: str, prefix: str) -> bool:
     else:
         return True
 
-
 def _get_docstring(completion: jedi.api.classes.BaseName) -> str:
     try:
         body = cast(str, completion.docstring(raw=True))
-    except Exception:
-        LOGGER.debug("Failed to get docstring for %s", completion.name)
+        if len(body) == 0 and completion.type == 'module': # fixes docstring for panda or other modules which set __doc__ explicitly through statement
+            doc_sym = [name for name in completion.goto()[0].defined_names() if name.type=='statement' and name.name =='__doc__']
+            if len(doc_sym)>0:
+                body = doc_sym[0]._name.tree_name.get_definition().children[2]._get_payload()
+    except Exception as e:
+        LOGGER.debug("Failed to get docstring for %s: %s", completion.name, str(e))
         return ""
 
     if completion.type == "function":
