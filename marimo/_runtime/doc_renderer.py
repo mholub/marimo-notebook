@@ -273,7 +273,7 @@ class MarimoTextDoc(pydoc.Doc):
         
         contents = self.multicolumn(modules)
         result = result + self.bigsection(
-            'Modules and Packages', 'pkg-content', contents)
+            'Modules', 'pkg-content', contents)
             
 
         # for key, value in classes:
@@ -294,13 +294,13 @@ class MarimoTextDoc(pydoc.Doc):
         #     #     contents.append(self.document(value, key, name, fdict, cdict))
         #     result = result + self.bigsection(
         #         'Classes', 'index', contents)
-        # if funcs:
-        #     contents = []
-        #     for key, value in funcs:
-        #         contents.append(key)
-        #     contents.sort(key=str.lower)
-        #     result = result + self.bigsection(
-        #         'Functions', 'functions', self.multicolumn(contents))
+
+        funcs = [name.name for name in all_defined_names if name.type == 'function']
+        funcs.sort(key=str.lower)
+
+        if funcs:
+            result = result + self.bigsection(
+                'Functions', 'functions', self.multicolumn(funcs))
         # if data:
         #     contents = []
         #     for key, value in data:
