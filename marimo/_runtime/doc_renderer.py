@@ -59,6 +59,14 @@ class MarimoTextDoc(pydoc.Doc):
             return name in all
         else:
             return not name.startswith('_')
+        
+    def cram(self, text, maxlen):
+        """Omit part of a string if needed to make it fit in a maximum length."""
+        if len(text) > maxlen:
+            pre = max(0, (maxlen-3)//2)
+            post = max(0, maxlen-3-pre)
+            return text[:pre] + '...' + text[len(text)-post:]
+        return text
 
     def section(self, title, cls, contents, width=6,
                 prelude='', marginalia=None, gap='&nbsp;'):
@@ -300,26 +308,13 @@ class MarimoTextDoc(pydoc.Doc):
         contents = self.multicolumn(modules)
         result = result + self.bigsection(
             'Modules', 'pkg-content', contents)
-            
-
-        # for key, value in classes:
-        #     for base in value.__bases__:
-        #         key, modname = base.__name__, base.__module__
-        #         module = sys.modules.get(modname)
-        #         if modname != name and module and hasattr(module, key):
-        #             if getattr(module, key) is base:
-        #                 if key not in cdict:
-        #                     cdict[key] = cdict[base] = modname + key
-
         
-
-        # if classes:
-        #     classlist = [value for (key, value) in classes]
-        #     contents = self.formattree(inspect.getclasstree(classlist, True), name, cdict)
-        #     # for key, value in classes:
-        #     #     contents.append(self.document(value, key, name, fdict, cdict))
-        #     result = result + self.bigsection(
-        #         'Classes', 'index', contents)
+        classes = [name.name for name in all_defined_names if name.type == 'class' and self.visiblename(name.name)]
+        classes.sort(key=str.lower)
+            
+        if classes:
+            result = result + self.bigsection(
+                'Classes', 'classes', self.multicolumn(classes))
 
         funcs = [name.name for name in all_defined_names if name.type == 'function' and self.visiblename(name.name)]
         funcs.sort(key=str.lower)
@@ -328,13 +323,15 @@ class MarimoTextDoc(pydoc.Doc):
             result = result + self.bigsection(
                 'Functions', 'functions', self.multicolumn(funcs))
         
-        datas = []
+        datas_dict = {}
         for name in all_defined_names:
             if name.type == 'statement' and self.visiblename(name.name):
                 desc = name.description
                 if desc.startswith(name.name + ' = '):
-                    datas.append(name.name)
-        datas = list(dict.fromkeys(datas))
+                    datas_dict[name.name] = self.escape(self.cram(desc, 512))
+                if desc.startswith("del"):
+                    datas_dict.pop(name.name, None)
+        datas = list(datas_dict.values())
         datas.sort(key=str.lower)
         if datas:
             result = result + self.bigsection(
