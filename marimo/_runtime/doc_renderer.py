@@ -83,10 +83,14 @@ class MarimoTextDoc(pydoc.Doc):
         rows = (num_items + num_columns - 1) // num_columns
 
         for col in range(num_columns):
-            result = result + '<td class="multicolumn">'
-            for i in range(col * rows, min((col + 1) * rows, num_items)):
-                result = result + format(list[i]) + '<br>\n'
-            result = result + '</td>'
+            start_index = col * rows
+            end_index = min((col + 1) * rows, num_items)
+            
+            if start_index < num_items:
+                result += '<td class="multicolumn">'
+                for i in range(start_index, end_index):
+                    result += format(list[i]) + '<br>\n'
+                result += '</td>'
 
         return '<table><tr>%s</tr></table>' % result
 
