@@ -34,6 +34,32 @@ class MarimoTextDoc(pydoc.Doc):
     def __init__(self) -> None:
         super().__init__()
 
+    _future_feature_names = set(__future__.all_feature_names)
+
+    def visiblename(self,name, all=None, obj=None):
+        """Decide whether to show documentation on a variable."""
+        # Certain special names are redundant or internal.
+        # XXX Remove __initializing__?
+        if name in {'__author__', '__builtins__', '__cached__', '__credits__',
+                    '__date__', '__doc__', '__file__', '__spec__',
+                    '__loader__', '__module__', '__name__', '__package__',
+                    '__path__', '__qualname__', '__slots__', '__version__'}:
+            return 0
+        # Private names are hidden, but special names are displayed.
+        if name.startswith('__') and name.endswith('__'): return 1
+        # Namedtuples have public fields and methods with a single leading underscore
+        if name.startswith('_') and hasattr(obj, '_fields'):
+            return True
+        # Ignore __future__ imports.
+        if obj is not __future__ and name in self._future_feature_names:
+            if isinstance(getattr(obj, name, None), __future__._Feature):
+                return False
+        if all is not None:
+            # only document that which the programmer exported in __all__
+            return name in all
+        else:
+            return not name.startswith('_')
+
     def section(self, title, cls, contents, width=6,
                 prelude='', marginalia=None, gap='&nbsp;'):
         """Format a section with a heading."""
@@ -268,7 +294,7 @@ class MarimoTextDoc(pydoc.Doc):
 
         all_defined_names = completion.goto()[0].defined_names()
 
-        modules = [name.name for name in all_defined_names if name.type == 'module']
+        modules = [name.name for name in all_defined_names if name.type == 'module' and self.visiblename(name.name)]
         modules.sort()
         
         contents = self.multicolumn(modules)
@@ -295,7 +321,7 @@ class MarimoTextDoc(pydoc.Doc):
         #     result = result + self.bigsection(
         #         'Classes', 'index', contents)
 
-        funcs = [name.name for name in all_defined_names if name.type == 'function']
+        funcs = [name.name for name in all_defined_names if name.type == 'function' and self.visiblename(name.name)]
         funcs.sort(key=str.lower)
 
         if funcs:
